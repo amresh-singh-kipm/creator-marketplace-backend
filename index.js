@@ -29,6 +29,9 @@ app.use("/test", (req, res) => {
   res.json({ message: "Test route" });
 });
 
+app.use("/", (req, res) => {
+  res.json({ message: "Welcome to the Creator Marketplace API" });
+});
 // SOCIAL LOGIN — uncomment when OAuth credentials are configured
 // app.use(
 //   session({
