@@ -20,6 +20,10 @@ app.use(
   require("express").static(require("path").join(__dirname, "uploads")),
 );
 
+app.use("/test", (req, res) => {
+  res.json({ message: "Test route" });
+});
+
 // SOCIAL LOGIN — uncomment when OAuth credentials are configured
 // app.use(
 //   session({
