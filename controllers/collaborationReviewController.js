@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { randomUUID } = require("crypto");
 
 // POST /api/collaboration-reviews
 const submitReview = async (req, res) => {
@@ -29,7 +30,7 @@ const submitReview = async (req, res) => {
         .json({ message: "You must be a participant to review" });
 
     // Cannot review yourself
-    if (parseInt(creator_id) === cp[0].id)
+    if (creator_id === cp[0].id)
       return res.status(400).json({ message: "Cannot review yourself" });
 
     // Collab must be completed
@@ -42,9 +43,10 @@ const submitReview = async (req, res) => {
         .status(400)
         .json({ message: "Collaboration must be completed before reviewing" });
 
-    const [result] = await pool.query(
-      "INSERT INTO collaboration_reviews (collaboration_id, reviewer_id, creator_id, rating, comment) VALUES (?,?,?,?,?)",
-      [collaboration_id, cp[0].id, creator_id, rating, comment],
+    const reviewId = randomUUID();
+    await pool.query(
+      "INSERT INTO collaboration_reviews (id, collaboration_id, reviewer_id, creator_id, rating, comment) VALUES (?,?,?,?,?,?)",
+      [reviewId, collaboration_id, cp[0].id, creator_id, rating, comment],
     );
 
     // Update collaboration_rating on creator_profiles
@@ -62,7 +64,7 @@ const submitReview = async (req, res) => {
     );
     if (reviewed.length) {
       await pool.query(
-        "INSERT INTO notifications (user_id, message) VALUES (?,?)",
+        "INSERT INTO notifications (id, user_id, message) VALUES (UUID(),?,?)",
         [
           reviewed[0].user_id,
           `You received a ${rating}⭐ collaboration review!`,
@@ -72,7 +74,7 @@ const submitReview = async (req, res) => {
 
     const [rows] = await pool.query(
       "SELECT * FROM collaboration_reviews WHERE id = ?",
-      [result.insertId],
+      [reviewId],
     );
     return res.status(201).json(rows[0]);
   } catch (err) {

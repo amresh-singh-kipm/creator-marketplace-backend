@@ -92,8 +92,8 @@ const requestWithdrawal = async (req, res) => {
     });
 
     await pool.query(
-      "INSERT INTO withdrawals (creator_id, amount, status, uuid) VALUES (?,?,'pending', UUID())",
-      [creatorProfileId, parseFloat(amount)],
+      "INSERT INTO withdrawals (creator_id, amount, status, details) VALUES (?,?,'pending',?)",
+      [creatorProfileId, parseFloat(amount), withdrawalMeta],
     );
 
     // Notify the creator
@@ -125,7 +125,22 @@ const getAdminWithdrawals = async (req, res) => {
       JOIN users u ON cp.user_id = u.id
       ORDER BY FIELD(w.status, 'pending', 'approved', 'rejected'), w.created_at DESC
     `);
-    return res.json(rows);
+
+    // Calculate global stats
+    const [earned] = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM creator_earnings WHERE status = 'paid'",
+    );
+    const [withdrawn] = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM withdrawals WHERE status IN ('pending', 'approved', 'paid')",
+    );
+    const availableBalance =
+      parseFloat(earned[0].total) - parseFloat(withdrawn[0].total);
+
+    return res.json({
+      withdrawals: rows,
+      availableBalance: Math.max(0, availableBalance),
+      totalWithdrawn: parseFloat(withdrawn[0].total),
+    });
   } catch (err) {
     console.error("getAdminWithdrawals error:", err);
     return res.status(500).json({ message: "Server error" });

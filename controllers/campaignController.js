@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { randomUUID } = require("crypto");
 
 // POST /api/campaigns
 const createCampaign = async (req, res) => {
@@ -10,12 +11,13 @@ const createCampaign = async (req, res) => {
     );
     if (!bp.length)
       return res.status(404).json({ message: "Brand profile not found" });
-    const [result] = await pool.query(
-      "INSERT INTO campaigns (brand_id, title, description, budget, category) VALUES (?,?,?,?,?)",
-      [bp[0].id, title, description, budget, category],
+    const newId = randomUUID();
+    await pool.query(
+      "INSERT INTO campaigns (id, brand_id, title, description, budget, category) VALUES (?,?,?,?,?,?)",
+      [newId, bp[0].id, title, description, budget, category],
     );
     const [rows] = await pool.query("SELECT * FROM campaigns WHERE id = ?", [
-      result.insertId,
+      newId,
     ]);
     return res.status(201).json(rows[0]);
   } catch (err) {

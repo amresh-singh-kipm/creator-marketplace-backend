@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { randomUUID } = require("crypto");
 
 // POST /api/reviews
 const createReview = async (req, res) => {
@@ -32,9 +33,10 @@ const createReview = async (req, res) => {
         .status(409)
         .json({ message: "Review already submitted for this booking" });
 
-    const [result] = await pool.query(
-      "INSERT INTO reviews (booking_id, brand_id, creator_id, rating, comment) VALUES (?,?,?,?,?)",
-      [booking_id, bp[0].id, booking[0].creator_id, rating, comment],
+    const reviewId = randomUUID();
+    await pool.query(
+      "INSERT INTO reviews (id, booking_id, brand_id, creator_id, rating, comment) VALUES (?,?,?,?,?,?)",
+      [reviewId, booking_id, bp[0].id, booking[0].creator_id, rating, comment],
     );
 
     // Manually update creator rating (trigger handles DB-side, but we also return updated)
@@ -46,7 +48,7 @@ const createReview = async (req, res) => {
     );
 
     const [rows] = await pool.query("SELECT * FROM reviews WHERE id = ?", [
-      result.insertId,
+      reviewId,
     ]);
     return res.status(201).json(rows[0]);
   } catch (err) {

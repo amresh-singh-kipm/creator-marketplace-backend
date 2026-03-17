@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { randomUUID } = require("crypto");
 
 // GET /api/messages?booking_id=X
 const getMessages = async (req, res) => {
@@ -49,16 +50,17 @@ const sendMessage = async (req, res) => {
       .status(400)
       .json({ message: "receiver_id and message required" });
   try {
-    const [result] = await pool.query(
-      "INSERT INTO messages (sender_id, receiver_id, booking_id, message) VALUES (?,?,?,?)",
-      [req.user.id, receiver_id, booking_id || null, message],
+    const msgId = randomUUID();
+    await pool.query(
+      "INSERT INTO messages (id, sender_id, receiver_id, booking_id, message) VALUES (?,?,?,?,?)",
+      [msgId, req.user.id, receiver_id, booking_id || null, message],
     );
     await pool.query(
-      "INSERT INTO notifications (user_id, message) VALUES (?,?)",
+      "INSERT INTO notifications (id, user_id, message) VALUES (UUID(),?,?)",
       [receiver_id, `New message from ${req.user.email}`],
     );
     const [rows] = await pool.query("SELECT * FROM messages WHERE id = ?", [
-      result.insertId,
+      msgId,
     ]);
     return res.status(201).json(rows[0]);
   } catch (err) {

@@ -23,7 +23,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- 1. users
 CREATE TABLE users (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   name        VARCHAR(100) NOT NULL,
   email       VARCHAR(150) UNIQUE NOT NULL,
   password    VARCHAR(255) NOT NULL,
@@ -34,8 +34,8 @@ CREATE TABLE users (
 
 -- 2. creator_profiles
 CREATE TABLE creator_profiles (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  user_id     INT UNIQUE,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  user_id     VARCHAR(36) UNIQUE,
   username    VARCHAR(100) UNIQUE NOT NULL,
   bio         TEXT,
   category    VARCHAR(100),
@@ -49,8 +49,8 @@ CREATE TABLE creator_profiles (
 
 -- 3. brand_profiles
 CREATE TABLE brand_profiles (
-  id           INT AUTO_INCREMENT PRIMARY KEY,
-  user_id      INT UNIQUE,
+  id           VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  user_id      VARCHAR(36) UNIQUE,
   company_name VARCHAR(200) NOT NULL,
   industry     VARCHAR(100),
   website      VARCHAR(300),
@@ -60,8 +60,8 @@ CREATE TABLE brand_profiles (
 
 -- 4. creator_platforms
 CREATE TABLE creator_platforms (
-  id              INT AUTO_INCREMENT PRIMARY KEY,
-  creator_id      INT,
+  id              VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  creator_id      VARCHAR(36),
   platform_name   VARCHAR(50) NOT NULL,
   username        VARCHAR(150),
   profile_url     VARCHAR(500),
@@ -72,8 +72,8 @@ CREATE TABLE creator_platforms (
 
 -- 5. promotion_packages
 CREATE TABLE promotion_packages (
-  id            INT AUTO_INCREMENT PRIMARY KEY,
-  creator_id    INT,
+  id            VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  creator_id    VARCHAR(36),
   package_name  VARCHAR(200) NOT NULL,
   description   TEXT,
   price         DECIMAL(12,2) NOT NULL,
@@ -84,8 +84,8 @@ CREATE TABLE promotion_packages (
 
 -- 6. campaigns
 CREATE TABLE campaigns (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  brand_id    INT,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  brand_id    VARCHAR(36),
   title       VARCHAR(300) NOT NULL,
   description TEXT,
   budget      DECIMAL(12,2),
@@ -97,9 +97,9 @@ CREATE TABLE campaigns (
 
 -- 7. campaign_invites
 CREATE TABLE campaign_invites (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  campaign_id INT,
-  creator_id  INT,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  campaign_id VARCHAR(36),
+  creator_id  VARCHAR(36),
   status      ENUM('pending', 'accepted', 'declined') DEFAULT 'pending',
   FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
   FOREIGN KEY (creator_id) REFERENCES creator_profiles(id) ON DELETE CASCADE
@@ -107,14 +107,18 @@ CREATE TABLE campaign_invites (
 
 -- 8. bookings
 CREATE TABLE bookings (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  brand_id    INT,
-  creator_id  INT,
-  package_id  INT,
-  campaign_id INT,
-  status      ENUM('pending','accepted','content_submitted','completed','cancelled') DEFAULT 'pending',
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  brand_id    VARCHAR(36),
+  creator_id  VARCHAR(36),
+  package_id  VARCHAR(36),
+  campaign_id VARCHAR(36),
+  status      ENUM('pending','accepted','content_submitted','content_rejected','completed','cancelled') DEFAULT 'pending',
   price       DECIMAL(12,2) NOT NULL,
   notes       TEXT,
+  content_url      VARCHAR(500),
+  content_type     VARCHAR(50),
+  content_note     TEXT,
+  rejection_reason TEXT,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (brand_id) REFERENCES brand_profiles(id) ON DELETE CASCADE,
   FOREIGN KEY (creator_id) REFERENCES creator_profiles(id) ON DELETE CASCADE,
@@ -124,8 +128,8 @@ CREATE TABLE bookings (
 
 -- 9. payments
 CREATE TABLE payments (
-  id                   INT AUTO_INCREMENT PRIMARY KEY,
-  booking_id           INT,
+  id                   VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  booking_id           VARCHAR(36),
   razorpay_order_id    VARCHAR(200),
   razorpay_payment_id  VARCHAR(200),
   amount               DECIMAL(12,2) NOT NULL,
@@ -136,8 +140,8 @@ CREATE TABLE payments (
 
 -- 10. escrow_wallet
 CREATE TABLE escrow_wallet (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  booking_id  INT UNIQUE,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  booking_id  VARCHAR(36) UNIQUE,
   amount      DECIMAL(12,2) NOT NULL,
   status      ENUM('held', 'released', 'refunded') DEFAULT 'held',
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -146,9 +150,9 @@ CREATE TABLE escrow_wallet (
 
 -- 11. creator_earnings
 CREATE TABLE creator_earnings (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  creator_id  INT,
-  booking_id  INT,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  creator_id  VARCHAR(36),
+  booking_id  VARCHAR(36),
   amount      DECIMAL(12,2) NOT NULL,
   status      ENUM('pending', 'paid') DEFAULT 'pending',
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -156,12 +160,23 @@ CREATE TABLE creator_earnings (
   FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
 );
 
--- 12. reviews
+-- 12. withdrawals
+CREATE TABLE withdrawals (
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  creator_id  VARCHAR(36) NOT NULL,
+  amount      DECIMAL(12,2) NOT NULL,
+  status      ENUM('pending', 'approved', 'rejected', 'paid') DEFAULT 'pending',
+  details     JSON,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (creator_id) REFERENCES creator_profiles(id) ON DELETE CASCADE
+);
+
+-- 13. reviews
 CREATE TABLE reviews (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  booking_id  INT UNIQUE,
-  brand_id    INT,
-  creator_id  INT,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  booking_id  VARCHAR(36) UNIQUE,
+  brand_id    VARCHAR(36),
+  creator_id  VARCHAR(36),
   rating      INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment     TEXT,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -172,10 +187,10 @@ CREATE TABLE reviews (
 
 -- 13. messages
 CREATE TABLE messages (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  sender_id   INT,
-  receiver_id INT,
-  booking_id  INT,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  sender_id   VARCHAR(36),
+  receiver_id VARCHAR(36),
+  booking_id  VARCHAR(36),
   message     TEXT NOT NULL,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -183,10 +198,21 @@ CREATE TABLE messages (
   FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL
 );
 
+-- 14. collaboration_messages
+CREATE TABLE collaboration_messages (
+  id               VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  collaboration_id VARCHAR(36) NOT NULL,
+  sender_id        VARCHAR(36) NOT NULL,
+  message          TEXT NOT NULL,
+  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (collaboration_id) REFERENCES collaborations(id) ON DELETE CASCADE,
+  FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- 14. notifications
 CREATE TABLE notifications (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  user_id     INT,
+  id          VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  user_id     VARCHAR(36),
   message     TEXT NOT NULL,
   read_status TINYINT(1) DEFAULT 0,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -195,9 +221,9 @@ CREATE TABLE notifications (
 
 -- 15. admin_logs
 CREATE TABLE admin_logs (
-  id         INT AUTO_INCREMENT PRIMARY KEY,
+  id         VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
   action     TEXT NOT NULL,
-  admin_id   INT,
+  admin_id   VARCHAR(36),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL
 );

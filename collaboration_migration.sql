@@ -3,14 +3,13 @@
 -- Run this against your existing creator_marketplace DB
 -- =====================================================
 
--- Add collaboration_rating column to creator_profiles
 ALTER TABLE creator_profiles
   ADD COLUMN collaboration_rating DECIMAL(3,2) DEFAULT 0.00;
 
 -- 1. collaborations
 CREATE TABLE IF NOT EXISTS collaborations (
-  id                   INT AUTO_INCREMENT PRIMARY KEY,
-  creator_id           INT NOT NULL,
+  id                   VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  creator_id           VARCHAR(36) NOT NULL,
   title                VARCHAR(300) NOT NULL,
   description          TEXT,
   platform             VARCHAR(50),
@@ -25,9 +24,9 @@ CREATE TABLE IF NOT EXISTS collaborations (
 
 -- 2. collaboration_requests
 CREATE TABLE IF NOT EXISTS collaboration_requests (
-  id                INT AUTO_INCREMENT PRIMARY KEY,
-  collaboration_id  INT NOT NULL,
-  creator_id        INT NOT NULL,
+  id                VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  collaboration_id  VARCHAR(36) NOT NULL,
+  creator_id        VARCHAR(36) NOT NULL,
   status            ENUM('pending','accepted','rejected') DEFAULT 'pending',
   message           TEXT,
   created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -38,9 +37,9 @@ CREATE TABLE IF NOT EXISTS collaboration_requests (
 
 -- 3. collaboration_participants
 CREATE TABLE IF NOT EXISTS collaboration_participants (
-  id                INT AUTO_INCREMENT PRIMARY KEY,
-  collaboration_id  INT NOT NULL,
-  creator_id        INT NOT NULL,
+  id                VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  collaboration_id  VARCHAR(36) NOT NULL,
+  creator_id        VARCHAR(36) NOT NULL,
   role              VARCHAR(100) DEFAULT 'collaborator',
   joined_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (collaboration_id) REFERENCES collaborations(id) ON DELETE CASCADE,
@@ -50,10 +49,10 @@ CREATE TABLE IF NOT EXISTS collaboration_participants (
 
 -- 4. collaboration_reviews
 CREATE TABLE IF NOT EXISTS collaboration_reviews (
-  id                INT AUTO_INCREMENT PRIMARY KEY,
-  collaboration_id  INT NOT NULL,
-  reviewer_id       INT NOT NULL,
-  creator_id        INT NOT NULL,
+  id                VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  collaboration_id  VARCHAR(36) NOT NULL,
+  reviewer_id       VARCHAR(36) NOT NULL,
+  creator_id        VARCHAR(36) NOT NULL,
   rating            INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment           TEXT,
   created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,

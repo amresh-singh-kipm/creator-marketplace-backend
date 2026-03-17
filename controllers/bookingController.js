@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { randomUUID } = require("crypto");
 
 // POST /api/bookings
 const createBooking = async (req, res) => {
@@ -19,20 +20,32 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: "Package not found" });
     const price = pkg[0].price;
 
-    const bookingUuid = require("crypto").randomUUID();
-    const [result] = await pool.query(
-      "INSERT INTO bookings (brand_id, creator_id, package_id, campaign_id, price, notes, uuid) VALUES (?,?,?,?,?,?,?)",
+    // Sanitize and validate campaign_id
+    const parsedCampaignId = campaign_id || null;
+    if (parsedCampaignId) {
+      const [camp] = await pool.query(
+        "SELECT id FROM campaigns WHERE id = ? AND brand_id = ?",
+        [parsedCampaignId, bp[0].id],
+      );
+      if (!camp.length)
+        return res
+          .status(400)
+          .json({ message: "Campaign not found or doesn't belong to you" });
+    }
+
+    const bookingId = randomUUID();
+    await pool.query(
+      "INSERT INTO bookings (id, brand_id, creator_id, package_id, campaign_id, price, notes) VALUES (?,?,?,?,?,?,?)",
       [
+        bookingId,
         bp[0].id,
         creator_id,
         package_id,
-        campaign_id || null,
+        parsedCampaignId,
         price,
         notes,
-        bookingUuid,
       ],
     );
-    const bookingId = result.insertId;
 
     // notify creator
     const [cp] = await pool.query(
@@ -41,11 +54,8 @@ const createBooking = async (req, res) => {
     );
     if (cp.length) {
       await pool.query(
-        "INSERT INTO notifications (user_id, message, uuid) VALUES (?, ?, UUID())",
-        [
-          cp[0].user_id,
-          `New booking request from a brand. Booking #${bookingId}`,
-        ],
+        "INSERT INTO notifications (id, user_id, message) VALUES (UUID(), ?, ?)",
+        [cp[0].user_id, `New booking request from a brand. Booking #${bookingId}`],
       );
     }
     const [rows] = await pool.query("SELECT * FROM bookings WHERE id = ?", [

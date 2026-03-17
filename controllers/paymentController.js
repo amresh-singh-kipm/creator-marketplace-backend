@@ -31,7 +31,7 @@ const createOrder = async (req, res) => {
     const order = await razorpay.orders.create({
       amount: amountInPaise,
       currency: "INR",
-      receipt: `booking_${booking_id}_${Date.now()}`,
+      receipt: `bk_${booking_id.substring(0, 8)}_${Date.now()}`,
       notes: { booking_id: String(booking_id) },
     });
 
@@ -49,7 +49,7 @@ const createOrder = async (req, res) => {
       );
     } else {
       await pool.query(
-        "INSERT INTO payments (booking_id, razorpay_order_id, amount, uuid) VALUES (?,?,?,UUID())",
+        "INSERT INTO payments (booking_id, razorpay_order_id, amount) VALUES (?,?,?)",
         [booking_id, order.id, b.price],
       );
     }

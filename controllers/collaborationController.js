@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { randomUUID } = require("crypto");
 
 // GET /api/collaborations
 const getCollaborations = async (req, res) => {
@@ -11,7 +12,7 @@ const getCollaborations = async (req, res) => {
     limit = 12,
   } = req.query;
   const offset = (page - 1) * limit;
-  let conditions = ["c.status = 'open'"];
+  let conditions = ["c.status IN ('open', 'in_progress')"];
   let params = [];
 
   if (platform) {
@@ -83,10 +84,12 @@ const createCollaboration = async (req, res) => {
         .status(403)
         .json({ message: "Only creators can post collaborations" });
 
-    const [result] = await pool.query(
-      `INSERT INTO collaborations (creator_id, title, description, platform, category, location, followers_required, collaboration_type)
-       VALUES (?,?,?,?,?,?,?,?)`,
+    const collabId = randomUUID();
+    await pool.query(
+      `INSERT INTO collaborations (id, creator_id, title, description, platform, category, location, followers_required, collaboration_type)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
       [
+        collabId,
         cp[0].id,
         title,
         description,
@@ -99,12 +102,12 @@ const createCollaboration = async (req, res) => {
     );
     // Owner auto-joins as host
     await pool.query(
-      "INSERT INTO collaboration_participants (collaboration_id, creator_id, role) VALUES (?,?,'host')",
-      [result.insertId, cp[0].id],
+      "INSERT INTO collaboration_participants (id, collaboration_id, creator_id, role) VALUES (UUID(),?,?,'host')",
+      [collabId, cp[0].id],
     );
     const [rows] = await pool.query(
       "SELECT * FROM collaborations WHERE id = ?",
-      [result.insertId],
+      [collabId],
     );
     return res.status(201).json(rows[0]);
   } catch (err) {
@@ -199,9 +202,10 @@ const applyToCollaboration = async (req, res) => {
     if (existing.length)
       return res.status(409).json({ message: "Already applied" });
 
-    const [result] = await pool.query(
-      "INSERT INTO collaboration_requests (collaboration_id, creator_id, message) VALUES (?,?,?)",
-      [id, cp[0].id, message || null],
+    const requestId = randomUUID();
+    await pool.query(
+      "INSERT INTO collaboration_requests (id, collaboration_id, creator_id, message) VALUES (?,?,?,?)",
+      [requestId, id, cp[0].id, message || null],
     );
     // Notify owner
     const [owner] = await pool.query(
@@ -219,7 +223,7 @@ const applyToCollaboration = async (req, res) => {
     }
     const [rows] = await pool.query(
       "SELECT * FROM collaboration_requests WHERE id = ?",
-      [result.insertId],
+      [requestId],
     );
     return res.status(201).json(rows[0]);
   } catch (err) {
@@ -368,11 +372,13 @@ const completeCollaboration = async (req, res) => {
 
 // GET /api/collaborations/my
 const getMyCollaborations = async (req, res) => {
+  console.log("first");
   try {
     const [cp] = await pool.query(
       "SELECT id FROM creator_profiles WHERE user_id = ?",
       [req.user.id],
     );
+    console.log(cp);
     if (!cp.length) return res.json([]);
 
     const [owned] = await pool.query(
@@ -393,6 +399,77 @@ const getMyCollaborations = async (req, res) => {
   }
 };
 
+// GET /api/collaborations/:id/messages
+const getCollaborationMessages = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [messages] = await pool.query(
+      `SELECT m.*, u.name AS sender_name, u.avatar_url AS sender_avatar, cp.username AS sender_username
+       FROM collaboration_messages m
+       JOIN users u ON m.sender_id = u.id
+       JOIN creator_profiles cp ON cp.user_id = u.id
+       WHERE m.collaboration_id = ?
+       ORDER BY m.created_at ASC`,
+      [id],
+    );
+    return res.json(messages);
+  } catch (err) {
+    console.error("getCollaborationMessages error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// POST /api/collaborations/:id/messages
+const postCollaborationMessage = async (req, res) => {
+  const { id } = req.params;
+  const { message } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ message: "Message cannot be empty" });
+  }
+
+  try {
+    // Check if user is a participant
+    const [cp] = await pool.query(
+      "SELECT id FROM creator_profiles WHERE user_id = ?",
+      [req.user.id],
+    );
+    if (!cp.length)
+      return res.status(403).json({ message: "Profile not found" });
+
+    const [participant] = await pool.query(
+      "SELECT id FROM collaboration_participants WHERE collaboration_id = ? AND creator_id = ?",
+      [id, cp[0].id],
+    );
+
+    if (!participant.length) {
+      return res
+        .status(403)
+        .json({ message: "You are not a participant in this collaboration" });
+    }
+
+    const messageId = randomUUID();
+    await pool.query(
+      "INSERT INTO collaboration_messages (id, collaboration_id, sender_id, message) VALUES (?,?,?,?)",
+      [messageId, id, req.user.id, message],
+    );
+
+    const [rows] = await pool.query(
+      `SELECT m.*, u.name AS sender_name, u.avatar_url AS sender_avatar, cp.username AS sender_username
+       FROM collaboration_messages m
+       JOIN users u ON m.sender_id = u.id
+       JOIN creator_profiles cp ON cp.user_id = u.id
+       WHERE m.id = ?`,
+      [messageId],
+    );
+
+    return res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("postCollaborationMessage error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   getCollaborations,
   createCollaboration,
@@ -402,4 +479,6 @@ module.exports = {
   rejectRequest,
   completeCollaboration,
   getMyCollaborations,
+  getCollaborationMessages,
+  postCollaborationMessage,
 };

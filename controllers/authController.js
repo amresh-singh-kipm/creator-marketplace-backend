@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { randomUUID } = require("crypto");
 const pool = require("../db");
 
 const signup = async (req, res) => {
@@ -21,36 +22,37 @@ const signup = async (req, res) => {
       return res.status(409).json({ message: "Email already registered" });
     }
     const hashed = await bcrypt.hash(password, 10);
-    const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
-    const userUuid = require("crypto").randomUUID();
-    const [result] = await pool.query(
-      "INSERT INTO users (name, email, password, role, avatar_url, uuid) VALUES (?, ?, ?, ?, ?, ?)",
-      [name, email, hashed, role, avatarUrl, userUuid],
+    const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
+      name,
+    )}`;
+    const userId = randomUUID();
+    await pool.query(
+      "INSERT INTO users (id, name, email, password, role, avatar_url) VALUES (?, ?, ?, ?, ?, ?)",
+      [userId, name, email, hashed, role, avatarUrl],
     );
-    const userId = result.insertId;
 
     // Create role-specific profile
     if (role === "creator") {
       const uname = username || email.split("@")[0];
       await pool.query(
-        "INSERT INTO creator_profiles (user_id, username) VALUES (?, ?)",
+        "INSERT INTO creator_profiles (id, user_id, username) VALUES (UUID(), ?, ?)",
         [userId, uname],
       );
     } else if (role === "brand") {
       const cname = company_name || name;
       await pool.query(
-        "INSERT INTO brand_profiles (user_id, company_name) VALUES (?, ?)",
+        "INSERT INTO brand_profiles (id, user_id, company_name) VALUES (UUID(), ?, ?)",
         [userId, cname],
       );
     }
 
     const [users] = await pool.query(
-      "SELECT id, uuid, name, email, role, avatar_url, created_at FROM users WHERE id = ?",
+      "SELECT id, name, email, role, avatar_url, created_at FROM users WHERE id = ?",
       [userId],
     );
     const user = users[0];
     const token = jwt.sign(
-      { id: user.id, uuid: user.uuid, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" },
     );
@@ -75,7 +77,7 @@ const login = async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: "Invalid credentials" });
     const token = jwt.sign(
-      { id: user.id, uuid: user.uuid, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" },
     );
@@ -90,7 +92,7 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT id, uuid, name, email, role, avatar_url, created_at FROM users WHERE id = ?",
+      "SELECT id, name, email, role, avatar_url, created_at FROM users WHERE id = ?",
       [req.user.id],
     );
     if (!rows.length)

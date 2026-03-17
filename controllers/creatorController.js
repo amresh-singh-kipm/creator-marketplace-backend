@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { randomUUID } = require("crypto");
 
 // GET /api/creators/categories - dynamic list of distinct categories from DB
 const getCategories = async (req, res) => {
@@ -217,9 +218,11 @@ const addPlatform = async (req, res) => {
     );
     if (!cp.length)
       return res.status(404).json({ message: "Profile not found" });
-    const [result] = await pool.query(
-      "INSERT INTO creator_platforms (creator_id, platform_name, username, profile_url, followers, engagement_rate) VALUES (?,?,?,?,?,?)",
+    const platformId = randomUUID();
+    await pool.query(
+      "INSERT INTO creator_platforms (id, creator_id, platform_name, username, profile_url, followers, engagement_rate) VALUES (?,?,?,?,?,?,?)",
       [
+        platformId,
         cp[0].id,
         platform_name,
         username,
@@ -230,7 +233,7 @@ const addPlatform = async (req, res) => {
     );
     const [rows] = await pool.query(
       "SELECT * FROM creator_platforms WHERE id = ?",
-      [result.insertId],
+      [platformId],
     );
     return res.status(201).json(rows[0]);
   } catch (err) {
@@ -248,17 +251,18 @@ const addPackage = async (req, res) => {
     );
     if (!cp.length)
       return res.status(404).json({ message: "Profile not found" });
-    const [result] = await pool.query(
-      "INSERT INTO promotion_packages (creator_id, package_name, description, price, delivery_days) VALUES (?,?,?,?,?)",
-      [cp[0].id, package_name, description, price, delivery_days],
+    const pkgId = randomUUID();
+    await pool.query(
+      "INSERT INTO promotion_packages (id, creator_id, package_name, description, price, delivery_days) VALUES (?,?,?,?,?,?)",
+      [pkgId, cp[0].id, package_name, description, price, delivery_days],
     );
     const [rows] = await pool.query(
       "SELECT * FROM promotion_packages WHERE id = ?",
-      [result.insertId],
+      [pkgId],
     );
     return res.status(201).json(rows[0]);
   } catch (err) {
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error", error: err });
   }
 };
 
