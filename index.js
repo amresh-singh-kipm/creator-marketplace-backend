@@ -10,6 +10,11 @@ const httpServer = createServer(app);
 initSocket(httpServer);
 const PORT = process.env.PORT || 5000;
 
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // Middleware
 app.use(
   cors({
@@ -36,6 +41,10 @@ app.use(
 
 app.use("/test", (req, res) => {
   res.json({ message: "Test route" });
+});
+
+app.get("/api/auth-test", (req, res) => {
+  res.json({ message: "Auth test route is reachable" });
 });
 
 // Session (required for OAuth redirect flow, short TTL)
