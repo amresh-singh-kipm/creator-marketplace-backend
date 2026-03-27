@@ -1,6 +1,6 @@
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
-const GitHubStrategy = require("passport-github2").Strategy;
+const FacebookStrategy = require("passport-facebook").Strategy;
 const pool = require("../db");
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
@@ -13,7 +13,12 @@ async function findOrCreateOAuthUser({
   name,
   avatarUrl,
 }) {
-  const idColumn = provider === "google" ? "google_id" : "github_id";
+  const idColumn =
+    provider === "google"
+      ? "google_id"
+      : provider === "facebook"
+        ? "facebook_id"
+        : "github_id";
 
   // 1. Try to find by provider ID
   const [byProvider] = await pool.query(
@@ -39,18 +44,23 @@ async function findOrCreateOAuthUser({
 
   // 3. Create new user (default role = creator, can change after login)
   const finalEmail = email || `${provider}_${providerId}@noemail.local`;
-  const [result] = await pool.query(
-    `INSERT INTO users (name, email, avatar_url, role, ${idColumn}, social_provider)
-     VALUES (?, ?, ?, 'creator', ?, ?)`,
-    [name, finalEmail, avatarUrl, providerId, provider],
+  const userId = require("crypto").randomUUID();
+  // Provide a random unguessable password hash to satisfy NOT NULL constraints
+  const dummyPassword = require("crypto").randomBytes(32).toString("hex");
+  
+  await pool.query(
+    `INSERT INTO users (id, name, email, avatar_url, role, ${idColumn}, social_provider, password)
+     VALUES (?, ?, ?, ?, 'creator', ?, ?, ?)`,
+    [userId, name, finalEmail, avatarUrl, providerId, provider, dummyPassword],
   );
-  const userId = result.insertId;
 
   // Auto-create creator profile
   const username =
-    (name || "user").toLowerCase().replace(/\s+/g, "_") + "_" + userId;
+    (name || "user").toLowerCase().replace(/\s+/g, "_") +
+    "_" +
+    userId.slice(0, 8);
   await pool.query(
-    "INSERT INTO creator_profiles (user_id, username) VALUES (?, ?)",
+    "INSERT INTO creator_profiles (id, user_id, username) VALUES (UUID(), ?, ?)",
     [userId, username],
   );
 
@@ -61,6 +71,8 @@ async function findOrCreateOAuthUser({
 }
 
 // ─── Google Strategy ─────────────────────────────────────────────────────────
+console.log(process.env.GOOGLE_CLIENT_ID);
+console.log(process.env.GOOGLE_CLIENT_SECRET);
 passport.use(
   new GoogleStrategy(
     {
@@ -87,24 +99,24 @@ passport.use(
   ),
 );
 
-// ─── GitHub Strategy ─────────────────────────────────────────────────────────
+// ─── Facebook Strategy ───────────────────────────────────────────────────────
 passport.use(
-  new GitHubStrategy(
+  new FacebookStrategy(
     {
-      clientID: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: `${BACKEND_URL}/api/auth/github/callback`,
-      scope: ["user:email"],
+      clientID: process.env.FACEBOOK_APP_ID,
+      clientSecret: process.env.FACEBOOK_APP_SECRET,
+      callbackURL: `${BACKEND_URL}/api/auth/facebook/callback`,
+      profileFields: ["id", "displayName", "emails", "photos"],
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
         const email = profile.emails?.[0]?.value;
         const avatarUrl = profile.photos?.[0]?.value;
         const user = await findOrCreateOAuthUser({
-          provider: "github",
-          providerId: String(profile.id),
+          provider: "facebook",
+          providerId: profile.id,
           email,
-          name: profile.displayName || profile.username,
+          name: profile.displayName,
           avatarUrl,
         });
         return done(null, user);

@@ -2,9 +2,10 @@
 -- Run against creator_marketplace DB
 
 ALTER TABLE users
-  ADD COLUMN google_id VARCHAR(255) NULL,
-  ADD COLUMN github_id VARCHAR(255) NULL,
-  ADD COLUMN social_provider VARCHAR(50) NULL;
+  ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS facebook_id VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS social_provider VARCHAR(50) NULL;
 
-CREATE UNIQUE INDEX idx_users_google_id ON users(google_id);
-CREATE UNIQUE INDEX idx_users_github_id ON users(github_id);
+-- Create indexes only if they don't exist
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_facebook_id ON users(facebook_id);

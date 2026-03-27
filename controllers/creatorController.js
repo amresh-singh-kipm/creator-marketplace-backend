@@ -169,7 +169,10 @@ const getCreatorByUsername = async (req, res) => {
 const getMyProfile = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT * FROM creator_profiles WHERE user_id = ?",
+      `SELECT cp.*, u.name, u.avatar_url 
+       FROM creator_profiles cp 
+       JOIN users u ON cp.user_id = u.id 
+       WHERE cp.user_id = ?`,
       [req.user.id],
     );
     if (!rows.length)
@@ -336,6 +339,27 @@ const getEarnings = async (req, res) => {
   }
 };
 
+// POST /api/creators/me/avatar
+const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided" });
+    }
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+    const avatarUrl = `${backendUrl}/uploads/${req.file.filename}`;
+
+    await pool.query("UPDATE users SET avatar_url = ? WHERE id = ?", [
+      avatarUrl,
+      req.user.id,
+    ]);
+
+    return res.json({ avatar_url: avatarUrl });
+  } catch (err) {
+    console.error("Avatar upload error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   getCategories,
   getCreators,
@@ -347,4 +371,5 @@ module.exports = {
   updatePackage,
   deletePackage,
   getEarnings,
+  uploadAvatar,
 };

@@ -1,5 +1,6 @@
 const pool = require("../db");
 const { randomUUID } = require("crypto");
+const { createNotification } = require("./notificationController");
 
 // POST /api/bookings
 const createBooking = async (req, res) => {
@@ -53,9 +54,11 @@ const createBooking = async (req, res) => {
       [creator_id],
     );
     if (cp.length) {
-      await pool.query(
-        "INSERT INTO notifications (id, user_id, message) VALUES (UUID(), ?, ?)",
-        [cp[0].user_id, `New booking request from a brand. Booking #${bookingId}`],
+      await createNotification(
+        cp[0].user_id,
+        "New Booking Request",
+        `You have a new booking request from a brand. Booking #${bookingId}`,
+        `/creator/bookings`
       );
     }
     const [rows] = await pool.query("SELECT * FROM bookings WHERE id = ?", [
@@ -195,9 +198,11 @@ const updateBookingStatus = async (req, res) => {
         [b.creator_id],
       );
       if (cp.length) {
-        await pool.query(
-          "INSERT INTO notifications (user_id, message) VALUES (?,?)",
-          [cp[0].user_id, `Payment released! Booking #${id} completed.`],
+        await createNotification(
+          cp[0].user_id,
+          "Payment Released",
+          `Booking #${id} is completed and payment has been released!`,
+          `/creator/earnings`
         );
       }
     }

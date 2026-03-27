@@ -1,5 +1,6 @@
 const pool = require("../db");
 const { randomUUID } = require("crypto");
+const { createNotification } = require("./notificationController");
 
 // GET /api/messages?booking_id=X
 const getMessages = async (req, res) => {
@@ -55,9 +56,11 @@ const sendMessage = async (req, res) => {
       "INSERT INTO messages (id, sender_id, receiver_id, booking_id, message) VALUES (?,?,?,?,?)",
       [msgId, req.user.id, receiver_id, booking_id || null, message],
     );
-    await pool.query(
-      "INSERT INTO notifications (id, user_id, message) VALUES (UUID(),?,?)",
-      [receiver_id, `New message from ${req.user.email}`],
+    await createNotification(
+      receiver_id,
+      "New Message",
+      `New message from ${req.user.name || req.user.email}`,
+      '/brand/messages'
     );
     const [rows] = await pool.query("SELECT * FROM messages WHERE id = ?", [
       msgId,
@@ -68,30 +71,4 @@ const sendMessage = async (req, res) => {
   }
 };
 
-// GET /api/notifications
-const getNotifications = async (req, res) => {
-  try {
-    const [rows] = await pool.query(
-      "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
-      [req.user.id],
-    );
-    return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ message: "Server error" });
-  }
-};
-
-// PUT /api/notifications/read
-const markAllRead = async (req, res) => {
-  try {
-    await pool.query(
-      "UPDATE notifications SET read_status = 1 WHERE user_id = ?",
-      [req.user.id],
-    );
-    return res.json({ message: "All marked as read" });
-  } catch (err) {
-    return res.status(500).json({ message: "Server error" });
-  }
-};
-
-module.exports = { getMessages, sendMessage, getNotifications, markAllRead };
+module.exports = { getMessages, sendMessage };

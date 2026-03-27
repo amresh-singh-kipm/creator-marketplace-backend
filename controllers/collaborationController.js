@@ -1,5 +1,6 @@
 const pool = require("../db");
 const { randomUUID } = require("crypto");
+const { createNotification } = require("./notificationController");
 
 // GET /api/collaborations
 const getCollaborations = async (req, res) => {
@@ -213,12 +214,11 @@ const applyToCollaboration = async (req, res) => {
       [collab[0].creator_id],
     );
     if (owner.length) {
-      await pool.query(
-        "INSERT INTO notifications (user_id, message) VALUES (?,?)",
-        [
-          owner[0].user_id,
-          `New collaboration request for "${collab[0].title}"`,
-        ],
+      await createNotification(
+        owner[0].user_id,
+        "New Collaboration Request",
+        `New collaboration request for "${collab[0].title}"`,
+        `/collaboration/${id}`
       );
     }
     const [rows] = await pool.query(
@@ -284,12 +284,11 @@ const acceptRequest = async (req, res) => {
         ],
       );
       // Notify applicant
-      await pool.query(
-        "INSERT INTO notifications (user_id, message) VALUES (?,?)",
-        [
-          applicantUser[0].user_id,
-          `Your collaboration request for "${collab[0].title}" was accepted! 🎉`,
-        ],
+      await createNotification(
+        applicantUser[0].user_id,
+        "Collaboration Accepted",
+        `Your collaboration request for "${collab[0].title}" was accepted! 🎉`,
+        `/collaboration/${id}`
       );
     }
 
@@ -355,12 +354,11 @@ const completeCollaboration = async (req, res) => {
       [id, cp[0].id],
     );
     for (const p of participants) {
-      await pool.query(
-        "INSERT INTO notifications (user_id, message) VALUES (?,?)",
-        [
-          p.user_id,
-          `Collaboration "${collab[0].title}" has been marked complete. Please leave a review!`,
-        ],
+      await createNotification(
+        p.user_id,
+        "Collaboration Completed",
+        `Collaboration "${collab[0].title}" has been marked complete. Please leave a review!`,
+        `/collaboration/${id}`
       );
     }
 
@@ -462,6 +460,23 @@ const postCollaborationMessage = async (req, res) => {
        WHERE m.id = ?`,
       [messageId],
     );
+
+    // Notify all participants except the sender
+    const [participantsToNotify] = await pool.query(
+      `SELECT cp.user_id FROM collaboration_participants cp_join
+       JOIN creator_profiles cp ON cp_join.creator_id = cp.id
+       WHERE cp_join.collaboration_id = ? AND cp.user_id != ?`,
+      [id, req.user.id]
+    );
+
+    for (const pt of participantsToNotify) {
+      await createNotification(
+        pt.user_id,
+        "New Collaboration Message",
+        `New message in collaboration chat`,
+        `/collaboration/${id}`
+      );
+    }
 
     return res.status(201).json(rows[0]);
   } catch (err) {

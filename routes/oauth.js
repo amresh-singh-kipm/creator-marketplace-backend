@@ -47,16 +47,16 @@ router.get(
   issueTokenAndRedirect,
 );
 
-// ─── GitHub ───────────────────────────────────────────────────────────────────
+// ─── Facebook ─────────────────────────────────────────────────────────────────
 router.get(
-  "/github",
-  passport.authenticate("github", { scope: ["user:email"], session: true }),
+  "/facebook",
+  passport.authenticate("facebook", { scope: ["email"], session: true }),
 );
 
 router.get(
-  "/github/callback",
-  passport.authenticate("github", {
-    failureRedirect: `${FRONTEND_URL}/login?error=github_failed`,
+  "/facebook/callback",
+  passport.authenticate("facebook", {
+    failureRedirect: `${FRONTEND_URL}/login?error=facebook_failed`,
     session: true,
   }),
   issueTokenAndRedirect,
